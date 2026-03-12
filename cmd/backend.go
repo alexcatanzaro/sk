@@ -99,7 +99,12 @@ After enabling, installed skills are immediately synced to the backend.`,
 
 		// Sync immediately.
 		fmt.Println("Syncing installed skills…")
-		if err := syncer.Run(cfg); err != nil {
+		baseDir, err := promptSyncBase()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: could not determine sync base: %v\n", err)
+			baseDir, _ = os.UserHomeDir()
+		}
+		if err := syncer.Run(cfg, baseDir); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: sync failed: %v\n", err)
 		}
 		return nil
