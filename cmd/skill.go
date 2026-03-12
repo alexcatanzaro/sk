@@ -143,9 +143,10 @@ type skillListModel struct {
 	selectedRegistry string
 	width            int
 	height           int
+	syncBase         string
 }
 
-func newSkillListModel(cfg *config.Config, fromRegistry string) skillListModel {
+func newSkillListModel(cfg *config.Config, fromRegistry string, syncBase string) skillListModel {
 	installed := make(map[string]bool)
 	for _, s := range cfg.InstalledSkills {
 		installed[s.Name] = true
@@ -156,6 +157,7 @@ func newSkillListModel(cfg *config.Config, fromRegistry string) skillListModel {
 		installed:     installed,
 		installing:    make(map[string]bool),
 		multiRegistry: fromRegistry == "" && len(cfg.Registries) > 1,
+		syncBase:      syncBase,
 	}
 
 	if m.multiRegistry {
@@ -339,7 +341,7 @@ func (m skillListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						installing:   m.installing,
 						spinnerFrame: m.spinnerFrame,
 					})
-					installCmd := installSkillCmd(m.cfg, si.info)
+					installCmd := installSkillCmd(m.cfg, si.info, m.syncBase)
 					if len(m.installing) == 1 {
 						// First install in flight: start the tick loop
 						return m, tea.Batch(installCmd, tickCmd())
@@ -420,7 +422,7 @@ func loadSkillsCmd(cfg *config.Config, registryName string) tea.Cmd {
 }
 
 // Task 3.2
-func installSkillCmd(cfg *config.Config, info skill.Info) tea.Cmd {
+func installSkillCmd(cfg *config.Config, info skill.Info, syncBase string) tea.Cmd {
 	return func() tea.Msg {
 		// Reload fresh config to safely handle concurrent installs.
 		freshCfg, err := config.Load()
@@ -447,7 +449,7 @@ func installSkillCmd(cfg *config.Config, info skill.Info) tea.Cmd {
 		}
 		backends := len(freshCfg.EnabledBackends)
 		if backends > 0 {
-			_ = syncer.Run(freshCfg)
+			_ = syncer.Run(freshCfg, syncBase)
 		}
 		return skillInstalledMsg{name: info.Name, registry: info.Registry, backends: backends}
 	}
@@ -486,7 +488,11 @@ Use --from to open a specific registry directly.`,
 			return fmt.Errorf("registry %q not found\n  → run: sk registry list", skillListFrom)
 		}
 
-		m := newSkillListModel(cfg, skillListFrom)
+		syncBase, err := promptSyncBase()
+		if err != nil {
+			return err
+		}
+		m := newSkillListModel(cfg, skillListFrom, syncBase)
 		p := tea.NewProgram(m, tea.WithAltScreen())
 		if _, err := p.Run(); err != nil {
 			return fmt.Errorf("TUI error: %w", err)
@@ -571,7 +577,12 @@ After installation, installed skills are automatically synced to all enabled bac
 		// Trigger sync automatically.
 		if len(cfg.EnabledBackends) > 0 {
 			fmt.Println("Syncing to enabled backends…")
-			if err := syncer.Run(cfg); err != nil {
+			baseDir, err := promptSyncBase()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "warning: could not determine sync base: %v\n", err)
+				baseDir, _ = os.UserHomeDir()
+			}
+			if err := syncer.Run(cfg, baseDir); err != nil {
 				fmt.Fprintf(os.Stderr, "warning: sync failed: %v\n", err)
 			}
 		}

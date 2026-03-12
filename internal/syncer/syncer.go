@@ -16,7 +16,7 @@ import (
 //
 // A broken symlink in installed/ is warned about and skipped.
 // Returns an error only if no backends are enabled or a copy fails.
-func Run(cfg *config.Config) error {
+func Run(cfg *config.Config, baseDir string) error {
 	if len(cfg.EnabledBackends) == 0 {
 		return fmt.Errorf("no backends enabled\n  → run: sk backend enable <name>")
 	}
@@ -45,20 +45,27 @@ func Run(cfg *config.Config) error {
 				fmt.Fprintf(os.Stderr, "warning: unknown backend %q in config — skipping\n", backendName)
 				continue
 			}
-			dest := filepath.Join(a.SkillsPath(), e.Name())
+			dest := filepath.Join(a.SkillsPathRelativeTo(baseDir), e.Name())
 			if err := copyDir(target, dest); err != nil {
 				return fmt.Errorf("syncing skill %q to backend %q: %w", e.Name(), backendName, err)
 			}
 		}
 	}
 
-	// Orphan cleanup: remove skills from backend paths no longer in installed/.
+	// Build the set of skill names sk has ever managed (from config).
+	// We only remove skills that sk previously synced — never externally-placed ones.
+	skManaged := map[string]bool{}
+	for _, s := range cfg.InstalledSkills {
+		skManaged[s.Name] = true
+	}
+
+	// Orphan cleanup: remove sk-managed skills from backend paths no longer in installed/.
 	for _, backendName := range cfg.EnabledBackends {
 		a := adapter.Find(backendName)
 		if a == nil {
 			continue
 		}
-		backendSkillsDir := a.SkillsPath()
+		backendSkillsDir := a.SkillsPathRelativeTo(baseDir)
 		bEntries, err := os.ReadDir(backendSkillsDir)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -67,7 +74,7 @@ func Run(cfg *config.Config) error {
 			return fmt.Errorf("reading backend skills dir %s: %w", backendSkillsDir, err)
 		}
 		for _, be := range bEntries {
-			if !installedNames[be.Name()] {
+			if skManaged[be.Name()] && !installedNames[be.Name()] {
 				orphan := filepath.Join(backendSkillsDir, be.Name())
 				if err := os.RemoveAll(orphan); err != nil {
 					fmt.Fprintf(os.Stderr, "warning: could not remove orphan %s: %v\n", orphan, err)

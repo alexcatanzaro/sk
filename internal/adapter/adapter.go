@@ -26,6 +26,10 @@ func (a StandardAdapter) SkillsPath() string {
 	return filepath.Join(home, a.dirname, "skills")
 }
 
+func (a StandardAdapter) SkillsPathRelativeTo(base string) string {
+	return filepath.Join(base, a.dirname, "skills")
+}
+
 func (a StandardAdapter) IsAvailable() bool {
 	home, _ := os.UserHomeDir()
 	_, err := os.Stat(filepath.Join(home, a.dirname))
