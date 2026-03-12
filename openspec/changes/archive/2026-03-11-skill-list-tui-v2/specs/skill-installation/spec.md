@@ -1,8 +1,5 @@
-# skill-installation Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change sk-package-manager. Update Purpose after archive.
-## Requirements
 ### Requirement: Browse available skills from registered registries
 The system SHALL provide a TUI selection interface for browsing skills available in registered registries. When multiple registries are configured, the TUI SHALL first present a registry picker; when only one registry is configured, the TUI SHALL open the skill browser directly. The skill browser SHALL display each skill's name and description, and SHALL visually mark already-installed skills with a ✓ glyph. The user MAY filter by registry using `--from <name>`, which bypasses the registry picker. If `--from` is given, skills from only that registry SHALL be shown.
 
@@ -48,15 +45,3 @@ The system SHALL install a skill by name from a registered registry into the can
 #### Scenario: Already installed (TUI)
 - **WHEN** user presses Enter on a skill already marked ✓ in the TUI
 - **THEN** system shows "already installed" in the status line and takes no further action
-
-### Requirement: Remove an installed skill
-The system SHALL allow users to remove an installed skill by name. Removing a skill SHALL delete its symlink from `installed/` and remove it from config. The system SHALL NOT delete the skill from the registry cache.
-
-#### Scenario: Remove installed skill
-- **WHEN** user runs `sk skill remove pdf-tools`
-- **THEN** system removes the `installed/pdf-tools` symlink and updates config
-
-#### Scenario: Remove skill not installed
-- **WHEN** user runs `sk skill remove <name>` for a skill not in installed/
-- **THEN** system exits with an error indicating the skill is not installed
-
